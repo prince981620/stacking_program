@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{Mint, Token}
+use anchor_spl::token::{Mint, Token};
 
 use crate::{error::ErrorCode, StateConfig, ADMIN};
 
@@ -38,11 +38,11 @@ impl <'info> InitializeConfig <'info> {
     pub fn initialize_config(
         &mut self,
         points_per_stake: u8,
-        freeze_periode: u32,
+        freeze_period: u32,
         bumps: &InitializeConfigBumps,
     ) -> Result<()> {
         self.config.set_inner(StateConfig {
-            point_per_stake,
+            points_per_stake,
             freeze_period,
             rewards_bump: bumps.reward_mint, 
             bump: bumps.config
