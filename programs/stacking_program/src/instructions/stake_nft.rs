@@ -6,10 +6,10 @@ use anchor_spl::{
         },
         MasterEditionAccount, Metadata, MetadataAccount,
     },
-    token::{approve, Approve, Mint, Token, TokenAccount},
+    token::{approve, mint_to, Approve, Mint, MintTo, Token, TokenAccount},
 };
 
-use crate::{StakeAccount, StateConfig, UserAccount};
+use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
 #[derive(Accounts)]
 pub struct StakeNFT<'info> {
@@ -26,6 +26,21 @@ pub struct StakeNFT<'info> {
         associated_token::authority = user
     )]
     pub mint_ata: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [b"rewards", config.key().as_ref()],
+        bump = config.rewards_bump,
+        mint::authority = config,
+    )]
+    pub reward_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = reward_mint,
+        associated_token::authority = user,
+    )]
+    pub user_reward_ata: Account<'info, TokenAccount>,
 
     #[account(
         seeds = [
@@ -100,7 +115,7 @@ impl<'info> StakeNFT<'info> {
         let metadata = &self.metadata_program.to_account_info();
 
         let seeds = &[
-            b"state",
+            b"stake",
             self.config.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
             &[self.stake_account.bump],
@@ -126,6 +141,37 @@ impl<'info> StakeNFT<'info> {
             bump: bumps.stake_account,
         });
 
+        let amount_u64 = u64::try_from(self.config.points_per_nft_stake).or(Err(ErrorCode::OverFlow))?;
+
+        let amount = amount_u64.checked_mul(1_000_000u64).unwrap();
+
+        self.reward_user(amount)?;
+
+        self.user_account.points = self.user_account.points.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
+        self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(1).ok_or(ErrorCode::OverFlow)?;
+
         Ok(())
+    }
+
+    pub fn reward_user(&mut self,amount: u64) -> Result<()> {
+        let cpi_program = self.token_program.to_account_info();
+
+        let cpi_accounts = MintTo {
+            mint: self.reward_mint.to_account_info(),
+            to: self.user_reward_ata.to_account_info(),
+            authority: self.config.to_account_info()
+        };
+
+        let seeds = &[
+            &b"config"[..],
+            &[self.config.bump]
+        ];
+
+        let signer_seeds = &[&seeds[..]];
+
+        let ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+
+        mint_to(ctx, amount)
+
     }
 }
