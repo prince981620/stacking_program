@@ -69,7 +69,7 @@ pub struct StakeNFT<'info> {
     pub master_edition: Account<'info, MasterEditionAccount>,
 
     #[account(
-        init,
+        init, // if we stake -> unstake and then stake again this may fail
         payer = user,
         seeds = [b"stake", config.key().as_ref(), mint.key().as_ref()],
         bump,
@@ -141,19 +141,19 @@ impl<'info> StakeNFT<'info> {
             bump: bumps.stake_account,
         });
 
-        let amount_u64 = u64::try_from(self.config.points_per_nft_stake).or(Err(ErrorCode::OverFlow))?;
+        let points_u64 = u64::try_from(self.config.points_per_nft_stake).or(Err(ErrorCode::OverFlow))?;
 
-        let amount = amount_u64.checked_mul(1_000_000u64).unwrap();
+        let reward_amount = points_u64.checked_mul(1_000_000u64).unwrap();
 
-        self.reward_user(amount)?;
+        self.reward_user(reward_amount)?;
 
-        self.user_account.points = self.user_account.points.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
+        self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(1).ok_or(ErrorCode::OverFlow)?;
 
         Ok(())
     }
 
-    pub fn reward_user(&mut self,amount: u64) -> Result<()> {
+    pub fn reward_user(&mut self, amount: u64) -> Result<()> {
         let cpi_program = self.token_program.to_account_info();
 
         let cpi_accounts = MintTo {
@@ -172,6 +172,5 @@ impl<'info> StakeNFT<'info> {
         let ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
 
         mint_to(ctx, amount)
-
     }
 }
