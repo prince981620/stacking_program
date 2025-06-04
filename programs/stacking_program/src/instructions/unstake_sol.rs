@@ -63,24 +63,36 @@ impl <'info> UnStakeSOl <'info> {
 
         require!(current.checked_sub(staked_at).unwrap() > self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
 
+        let seeds = &[
+            b"vault",
+            self.stake_account.to_account_info().key.as_ref(),
+            &[self.stake_account.vault_bump],
+        ];
+
+        let signer_seeds = &[&seeds[..]];
+
         let cpi_program = self.system_program.to_account_info();
         let cpi_accounts = Transfer {
             from: self.vault.to_account_info(),
             to: self.user.to_account_info(),
         };
 
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+
         transfer(cpi_ctx, self.vault.lamports())?;
 
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(self.vault.lamports()).ok_or(ErrorCode::OverFlow)?;
 
-        self.close_pdas()?;
-        
-        Ok(())
 
-    }
+        let seeds = &[
+            b"stake",
+            self.config.to_account_info().key.as_ref(),
+            self.user.to_account_info().key.as_ref(),
+            &[self.stake_account.bump],
+        ];
 
-    pub fn close_pdas (&mut self) -> Result<()> {
+        let signer_seeds = &[&seeds[..]];
+
         let close_accounts = CloseAccount {
             account: self.stake_account.to_account_info(),
             destination: self.user.to_account_info(),
@@ -89,8 +101,12 @@ impl <'info> UnStakeSOl <'info> {
 
         let close_cpi_ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), close_accounts, signer_seeds);
 
-        close_account(close_cpi_ctx)
+        close_account(close_cpi_ctx)?;
+
+        Ok(())
+
     }
+
 
 
 }

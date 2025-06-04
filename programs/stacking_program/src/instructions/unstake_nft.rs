@@ -147,12 +147,6 @@ impl<'info> UnStakeNFT<'info> {
 
         // now we close stake_account pda
 
-        self.close_pdas()?;
-
-        Ok(())
-    }
-
-    pub fn close_pdas (&mut self) -> Result<()> {
         let close_accounts = CloseAccount {
             account: self.stake_account.to_account_info(),
             destination: self.user.to_account_info(),
@@ -161,7 +155,9 @@ impl<'info> UnStakeNFT<'info> {
 
         let close_cpi_ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), close_accounts, signer_seeds);
 
-        close_account(close_cpi_ctx)
+        close_account(close_cpi_ctx)?;
+
+        Ok(())
     }
 
 }
