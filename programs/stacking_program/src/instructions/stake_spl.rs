@@ -1,10 +1,8 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{associated_token::AssociatedToken, token::{mint_to, Mint, MintTo, Token, TokenAccount, TransferChecked}};
-
+use anchor_spl::{associated_token::AssociatedToken, token::{mint_to, transfer_checked, Mint, MintTo, Token, TokenAccount, TransferChecked}};
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
 #[derive(Accounts)]
-#[instruction(seed: u64)]
 pub struct StakeSPL <'info> {
 
     #[account(mut)]
@@ -31,14 +29,13 @@ pub struct StakeSPL <'info> {
         mut,
         associated_token::mint = reward_mint,
         associated_token::authority = user,
-        associated_token::token_program = token_program
     )]
     pub user_reward_ata: Account<'info, TokenAccount>,
 
     #[account(
         init,
         payer = user,
-        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), seed.to_le_bytes().as_ref()], // seed so that user can stake multiple ammounts
+        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), mint.key().as_ref()], // seed so that user can stake multiple ammounts
         bump,
         space = 8 + StakeAccount::INIT_SPACE
     )]
@@ -55,7 +52,6 @@ pub struct StakeSPL <'info> {
         payer = user,
         associated_token::mint = mint,
         associated_token::authority = stake_account,
-        associated_token::token_program = token_program
     )]
     pub vault_ata: Account<'info, TokenAccount>,
 
@@ -67,15 +63,15 @@ pub struct StakeSPL <'info> {
     pub user_account: Account<'info, UserAccount>,
 
     pub token_program: Program<'info, Token>,
-    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
+    pub associated_token_program: Program<'info, AssociatedToken>
 } 
 
 impl <'info> StakeSPL <'info> {
 
     pub fn stake_spl(&mut self, amount: u64, bumps: &StakeSPLBumps) -> Result<()> {
 
-        let cpi_program = self.token_program.to_account_info(),
+        let cpi_program = self.token_program.to_account_info();
         
         let cpi_accounts = TransferChecked {
             from: self.mint_ata.to_account_info(),
@@ -88,9 +84,9 @@ impl <'info> StakeSPL <'info> {
 
         transfer_checked(cpi_ctx, amount, self.mint.decimals)?;
 
-        let pints_u64 = u64::try_from(self.config.points_per_spl_stake).or(Err(ErrorCode::OverFlow))?;
+        let points_u64 = u64::try_from(self.config.points_per_spl_stake).or(Err(ErrorCode::OverFlow))?;
 
-        let reward_amount = pints_u64.checked_mul(amount).unwrap(); // amount is already in lamports
+        let reward_amount = points_u64.checked_mul(amount).unwrap(); // amount is already in lamports
 
         self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
@@ -99,10 +95,10 @@ impl <'info> StakeSPL <'info> {
 
         self.stake_account.set_inner(StakeAccount {
             owner: self.user.key(),
-            mint: self.mint.to_account_info(),
+            mint: self.mint.key(),
             staked_at: Clock::get()?.unix_timestamp,
             bump: bumps.stake_account,
-            vault_bump: bumps.vault
+            vault_bump: 0
         });
 
         Ok(())

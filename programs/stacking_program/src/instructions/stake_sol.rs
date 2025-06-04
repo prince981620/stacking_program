@@ -1,10 +1,9 @@
 use anchor_lang::{prelude::*, system_program::{transfer, Transfer}};
-use anchor_spl::{token::{mint_to, Mint, MintTo, Token, TokenAccount}, token_2022::spl_token_2022::native_mint};
+use anchor_spl::token::{mint_to, spl_token::native_mint, Mint, MintTo, Token, TokenAccount};
 
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
 #[derive(Accounts)]
-#[instruction(seed: u64)]
 pub struct StakeSOl <'info> {
 
     #[account(mut)]
@@ -28,7 +27,7 @@ pub struct StakeSOl <'info> {
     #[account(
         init,
         payer = user,
-        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), seed.to_le_bytes().as_ref()], // seed so that user can stake multiple ammounts
+        seeds = [b"stake", config.key().as_ref(), user.key().as_ref()], // seed so that user can stake multiple ammounts
         bump,
         space = 8 + StakeAccount::INIT_SPACE
     )]
@@ -58,7 +57,7 @@ pub struct StakeSOl <'info> {
 } 
 
 impl <'info> StakeSOl <'info> {
-    pub fn stake_sol(&mut self, seed: u64, amount: u64, bumps: &StakeSOlBumps) -> Result<()> {
+    pub fn stake_sol(&mut self, amount: u64, bumps: &StakeSOlBumps) -> Result<()> {
         let cpi_program = self.system_program.to_account_info();
         let cpi_accounts = Transfer {
             from: self.user.to_account_info(),
@@ -68,17 +67,9 @@ impl <'info> StakeSOl <'info> {
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         transfer(cpi_ctx, amount)?;
 
-        let pints_u64 = u64::try_from(self.config.points_per_sol_stake).or(Err(ErrorCode::OverFlow))?;
+        let points_u64 = u64::try_from(self.config.points_per_sol_stake).or(Err(ErrorCode::OverFlow))?;
 
-        let reward_amount = pints_u64.checked_mul(amount).unwrap(); // amount is already in lamports
-
-        self.stake_account.set_inner(StakeAccount {
-            owner: self.user.key(),
-            mint: native_mint::id(),
-            staked_at: Clock::get()?.unix_timestamp,
-            bump: bumps.stake_account,
-            vault_bump: bumps.vault
-        });
+        let reward_amount = points_u64.checked_mul(amount).unwrap(); // amount is already in lamports
 
         self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
@@ -87,7 +78,7 @@ impl <'info> StakeSOl <'info> {
 
         self.stake_account.set_inner(StakeAccount {
             owner: self.user.key(),
-            mint: self.mint.to_account_info(),
+            mint: native_mint::id(),
             staked_at: Clock::get()?.unix_timestamp,
             bump: bumps.stake_account,
             vault_bump: bumps.vault
