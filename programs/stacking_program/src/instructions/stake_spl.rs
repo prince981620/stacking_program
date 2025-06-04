@@ -1,14 +1,23 @@
-use anchor_lang::{prelude::*, system_program::{transfer, Transfer}};
-use anchor_spl::{token::{mint_to, Mint, MintTo, Token, TokenAccount}, token_2022::spl_token_2022::native_mint};
+use anchor_lang::prelude::*;
+use anchor_spl::{associated_token::AssociatedToken, token::{mint_to, Mint, MintTo, Token, TokenAccount, TransferChecked}};
 
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
 #[derive(Accounts)]
 #[instruction(seed: u64)]
-pub struct StakeSOl <'info> {
+pub struct StakeSPL <'info> {
 
     #[account(mut)]
     pub user: Signer<'info>,
+
+    pub mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = user
+    )]
+    pub mint_ata: Account<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -22,6 +31,7 @@ pub struct StakeSOl <'info> {
         mut,
         associated_token::mint = reward_mint,
         associated_token::authority = user,
+        associated_token::token_program = token_program
     )]
     pub user_reward_ata: Account<'info, TokenAccount>,
 
@@ -41,11 +51,14 @@ pub struct StakeSOl <'info> {
     pub config: Account<'info, StateConfig>,
 
     #[account(
-        mut,
-        seeds = [b"vault", stake_account.key().as_ref()],
-        bump,
+        init,
+        payer = user,
+        associated_token::mint = mint,
+        associated_token::authority = stake_account,
+        associated_token::token_program = token_program
     )]
-    pub vault: SystemAccount<'info>,
+    pub vault_ata: Account<'info, TokenAccount>,
+
 
     #[account(
         seeds = [b"user", user.key().as_ref()],
@@ -54,31 +67,30 @@ pub struct StakeSOl <'info> {
     pub user_account: Account<'info, UserAccount>,
 
     pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 } 
 
-impl <'info> StakeSOl <'info> {
-    pub fn stake_sol(&mut self, seed: u64, amount: u64, bumps: &StakeSOlBumps) -> Result<()> {
-        let cpi_program = self.system_program.to_account_info();
-        let cpi_accounts = Transfer {
-            from: self.user.to_account_info(),
-            to: self.vault.to_account_info(),
+impl <'info> StakeSPL <'info> {
+
+    pub fn stake_spl(&mut self, amount: u64, bumps: &StakeSPLBumps) -> Result<()> {
+
+        let cpi_program = self.token_program.to_account_info(),
+        
+        let cpi_accounts = TransferChecked {
+            from: self.mint_ata.to_account_info(),
+            mint: self.mint.to_account_info(),
+            to: self.vault_ata.to_account_info(),
+            authority: self.user.to_account_info()
         };
 
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        transfer(cpi_ctx, amount)?;
 
-        let pints_u64 = u64::try_from(self.config.points_per_sol_stake).or(Err(ErrorCode::OverFlow))?;
+        transfer_checked(cpi_ctx, amount, self.mint.decimals)?;
+
+        let pints_u64 = u64::try_from(self.config.points_per_spl_stake).or(Err(ErrorCode::OverFlow))?;
 
         let reward_amount = pints_u64.checked_mul(amount).unwrap(); // amount is already in lamports
-
-        self.stake_account.set_inner(StakeAccount {
-            owner: self.user.key(),
-            mint: native_mint::id(),
-            staked_at: Clock::get()?.unix_timestamp,
-            bump: bumps.stake_account,
-            vault_bump: bumps.vault
-        });
 
         self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
@@ -94,9 +106,7 @@ impl <'info> StakeSOl <'info> {
         });
 
         Ok(())
-
     }
-
     pub fn reward_user(&mut self,amount: u64) -> Result<()> {
         let cpi_program = self.token_program.to_account_info();
 
