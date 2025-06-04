@@ -63,8 +63,8 @@ pub struct StakeSPL <'info> {
     pub user_account: Account<'info, UserAccount>,
 
     pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
-    pub associated_token_program: Program<'info, AssociatedToken>
 } 
 
 impl <'info> StakeSPL <'info> {

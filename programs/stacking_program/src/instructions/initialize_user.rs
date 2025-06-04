@@ -12,7 +12,7 @@ pub struct InitializeUser<'info> {
         payer = user,
         seeds = [b"user", user.key().as_ref()],
         bump,
-        space = UserAccount::INIT_SPACE
+        space = 8 + UserAccount::INIT_SPACE
     )]
     pub user_account: Account<'info, UserAccount>,
 
