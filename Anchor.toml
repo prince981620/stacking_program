@@ -17,3 +17,14 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+[test.validator]
+bind_address = "0.0.0.0"
+# url = "https://api.mainnet-beta.solana.com"
+url = "https://few-twilight-wish.solana-mainnet.quiknode.pro/5337a237aaeecd58b8c43a375c78a541aafccf04"
+ledger = ".anchor/test-ledger"
+rpc_port = 8899
+
+
+[[test.validator.clone]]
+address = "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

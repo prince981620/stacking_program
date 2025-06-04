@@ -61,7 +61,7 @@ pub struct StakeNFT<'info> {
             b"metadata",
             metadata_program.key().as_ref(),
             mint.key().as_ref(),
-            b"editon"
+            b"edition"
         ],
         bump,
         seeds::program = metadata_program.key()
@@ -118,7 +118,7 @@ impl<'info> StakeNFT<'info> {
             b"stake",
             self.config.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
-            &[self.stake_account.bump],
+            &[bumps.stake_account],
         ];
 
         let signer_seeds = &[&seeds[..]];

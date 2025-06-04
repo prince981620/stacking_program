@@ -6,6 +6,10 @@ import { Commitment, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.j
 import { createMint, getAssociatedTokenAddress, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { assert } from "chai";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
+import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { createSignerFromKeypair, generateSigner, keypairIdentity, KeypairSigner, percentAmount } from "@metaplex-foundation/umi";
+import { createNft, findMasterEditionPda, findMetadataPda, mplTokenMetadata, verifySizedCollectionItem } from "@metaplex-foundation/mpl-token-metadata";
 
 describe("stacking_program", () => {
 
@@ -41,6 +45,10 @@ describe("stacking_program", () => {
   const provider = anchor.getProvider();
   const connection = provider.connection;
 
+  const umi = createUmi(connection);
+
+  const payer = provider.wallet as NodeWallet;
+
   const admin = Keypair.fromSecretKey(new Uint8Array(wallet));
 
   const config = PublicKey.findProgramAddressSync(
@@ -59,6 +67,26 @@ describe("stacking_program", () => {
   
   let mint: PublicKey;
 
+  let nftMint: KeypairSigner = generateSigner(umi);
+  let collectionMint: KeypairSigner = generateSigner(umi);
+
+  const creatorWallet = umi.eddsa.createKeypairFromSecretKey(
+    new Uint8Array(user.secretKey)
+  );
+
+  const creator = createSignerFromKeypair(umi, creatorWallet);
+  umi.use(keypairIdentity(creator));
+  umi.use(mplTokenMetadata());
+
+  const collection: anchor.web3.PublicKey = new anchor.web3.PublicKey(
+    collectionMint.publicKey.toString()
+  );
+
+  // const nft_mint: anchor.web3.PublicKey = new anchor.web3.PublicKey(
+  //   nftMint.publicKey.toString()
+  // );
+
+
   it("Airdrop and create Mints",async ()=>{
 
     await Promise.all([admin,user].map(async (k) => {
@@ -73,6 +101,64 @@ describe("stacking_program", () => {
       6
     );
 
+    console.log("mint:", mint.toBase58());
+
+    // mint collection NFT
+    await createNft(umi, {
+      mint: collectionMint,
+      name : "Royal Collection",
+      symbol: "ROYAL",
+      uri: "https://arweave.net/69",
+      sellerFeeBasisPoints: percentAmount(6.9),
+      creators: null,
+      collectionDetails: {
+        __kind: "V1",
+        size: 10,
+      },
+    }).sendAndConfirm(umi);
+
+    console.log("NFT collection created :", collectionMint.publicKey.toString());
+
+    // Mint NFT
+
+    await createNft(umi, {
+      mint: nftMint,
+      name: "King",
+      symbol: "KING",
+      uri: "https://arweave.net/96",
+      sellerFeeBasisPoints: percentAmount(6.9),
+      creators: null,
+      collection: {
+        verified: false,
+        key: collectionMint.publicKey,
+      }
+    }).sendAndConfirm(umi);
+
+    console.log("created NFT:", nftMint.publicKey.toString());
+
+    // varify collection
+
+    const collectionMetadata = findMetadataPda(umi, {
+      mint: collectionMint.publicKey
+    });
+
+    const collectionMasterEdition = findMasterEditionPda(umi, {
+      mint: collectionMint.publicKey
+    });
+
+    const nftMetadata = findMetadataPda(umi, {
+      mint: nftMint.publicKey
+    });
+
+    await verifySizedCollectionItem(umi, {
+      metadata: nftMetadata,
+      collectionAuthority: creator,
+      collectionMint: collectionMint.publicKey,
+      collection: collectionMetadata,
+      collectionMasterEditionAccount: collectionMasterEdition
+    }).sendAndConfirm(umi);
+
+    console.log("Collection NFT is now verified");
   })
 
 
@@ -123,7 +209,16 @@ describe("stacking_program", () => {
     console.log("tx:", tx);
   })
 
-  it("stake sol", async ()=>{
+  let nft_ata: PublicKey;
+  let metadata: PublicKey;
+  let masterEditon: PublicKey;
+
+  it("stake NFT" ,async ()=> {
+
+    const nft_mint_ata = getAssociatedTokenAddressSync(
+      new PublicKey(nftMint.publicKey),
+      user.publicKey
+    );
 
     user_reward_ata = (await getOrCreateAssociatedTokenAccount(
       connection,
@@ -132,14 +227,69 @@ describe("stacking_program", () => {
       user.publicKey
     )).address;
 
-    const reward_recieved_initial = await connection.getTokenAccountBalance(user_reward_ata);
+    stake_account = PublicKey.findProgramAddressSync(
+      [Buffer.from("stake"), config.toBuffer(), new PublicKey(nftMint.publicKey).toBuffer()],
+      program.programId
+    )[0];
 
-    console.log("rewards_received initial:", reward_recieved_initial);
+    const [metadata] = findMetadataPda(umi, { mint: nftMint.publicKey });
+    const [masterEditon] = findMasterEditionPda(umi, {
+      mint: nftMint.publicKey,
+    });
+
+    console.log(
+      "user", user.publicKey,
+      "mint", nftMint.publicKey,
+      "collectionMint", collectionMint.publicKey,
+      "mintAta", nft_mint_ata,
+      "rewardMint", reward_mint,
+      "userRewardAta", user_reward_ata,
+      "metadata", metadata,
+      "masterEdition", masterEditon,
+      "stakeAccount", stake_account,
+      "config", config,
+      "userAccount", user_account,
+    )
+
+    const tx = await program.methods
+    .stakeNft()
+    .accountsStrict({
+      user: user.publicKey,
+      mint: nftMint.publicKey,
+      collectionMint: collectionMint.publicKey,
+      mintAta: nft_mint_ata,
+      rewardMint: reward_mint,
+      userRewardAta: user_reward_ata,
+      metadata: metadata,
+      masterEdition: masterEditon,
+      stakeAccount: stake_account,
+      config: config,
+      userAccount: user_account,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      metadataProgram: new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"),
+      systemProgram: anchor.web3.SystemProgram.programId
+    })
+    .signers([user])
+    .rpc()
+
+    console.log("tx: ", tx);
+    const reward_recieved = await connection.getTokenAccountBalance(user_reward_ata);
+
+    console.log("rewards_received :", reward_recieved?.value?.uiAmount);
+  })
+
+  it("stake sol", async ()=>{
 
     stake_account = PublicKey.findProgramAddressSync(
       [Buffer.from("stake"), config.toBuffer(), user.publicKey.toBuffer()],
       program.programId
     )[0];
+
+    const reward_recieved_initial = await connection.getTokenAccountBalance(user_reward_ata);
+
+    console.log("rewards_received initial:", reward_recieved_initial);
+
+    
 
     const vault = PublicKey.findProgramAddressSync(
       [Buffer.from("vault"), stake_account.toBuffer()],
