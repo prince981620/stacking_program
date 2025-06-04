@@ -1,13 +1,21 @@
-use anchor_lang::{prelude::*, system_program::{transfer, Transfer}};
-use anchor_spl::token::{close_account, CloseAccount, Mint, Token, TokenAccount};
-
+use anchor_lang::prelude::*;
+use anchor_spl::{associated_token::AssociatedToken, token::{close_account, transfer_checked, CloseAccount, Mint, Token, TokenAccount, TransferChecked}};
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
 #[derive(Accounts)]
-pub struct UnStakeSOl <'info> {
+pub struct UnStakeSPL <'info> {
 
     #[account(mut)]
     pub user: Signer<'info>,
+
+    pub mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = user
+    )]
+    pub mint_ata: Account<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -27,8 +35,8 @@ pub struct UnStakeSOl <'info> {
     #[account(
         mut,
         close = user,
-        seeds = [b"stake", config.key().as_ref(), user.key().as_ref()], // seed so that user can stake multiple ammounts
-        bump = stake_account.bump,
+        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), mint.key().as_ref()], // seed so that user can stake multiple ammounts
+        bump = stake_account.bump
     )]
     pub stake_account: Account<'info, StakeAccount>,
     
@@ -39,11 +47,13 @@ pub struct UnStakeSOl <'info> {
     pub config: Account<'info, StateConfig>,
 
     #[account(
-        mut,
-        seeds = [b"vault", stake_account.key().as_ref()],
-        bump = stake_account.vault_bump,
+        init,
+        payer = user,
+        associated_token::mint = mint,
+        associated_token::authority = stake_account,
     )]
-    pub vault: SystemAccount<'info>,
+    pub vault_ata: Account<'info, TokenAccount>,
+
 
     #[account(
         seeds = [b"user", user.key().as_ref()],
@@ -53,45 +63,36 @@ pub struct UnStakeSOl <'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    pub associated_token_program: Program<'info, AssociatedToken>
 } 
 
-impl <'info> UnStakeSOl <'info> {
-    pub fn unstake_sol(&mut self) -> Result<()> {
+impl <'info> UnStakeSPL <'info> {
 
-        let staked_at = self.stake_account.staked_at;
-        let current = Clock::get()?.unix_timestamp;
-
-        require!(current.checked_sub(staked_at).unwrap() > self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
-
-        let seeds = &[
-            b"vault",
-            self.stake_account.to_account_info().key.as_ref(),
-            &[self.stake_account.vault_bump],
-        ];
-
-        let signer_seeds = &[&seeds[..]];
-
-        let cpi_program = self.system_program.to_account_info();
-        let cpi_accounts = Transfer {
-            from: self.vault.to_account_info(),
-            to: self.user.to_account_info(),
-        };
-
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
-
-        transfer(cpi_ctx, self.vault.lamports())?;
-
-        self.user_account.sol_staked_amount = self.user_account.sol_staked_amount.checked_sub(self.vault.lamports()).ok_or(ErrorCode::OverFlow)?;
-
+    pub fn unstake_spl(&mut self) -> Result<()> {
 
         let seeds = &[
             b"stake",
             self.config.to_account_info().key.as_ref(),
-            self.user.to_account_info().key.as_ref(),
+            self.mint.to_account_info().key.as_ref(),
             &[self.stake_account.bump],
         ];
 
         let signer_seeds = &[&seeds[..]];
+
+        let cpi_program = self.token_program.to_account_info();
+        
+        let cpi_accounts = TransferChecked {
+            from: self.vault_ata.to_account_info(),
+            mint: self.mint.to_account_info(),
+            to: self.mint_ata.to_account_info(),
+            authority: self.stake_account.to_account_info()
+        };
+
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+
+        transfer_checked(cpi_ctx, self.vault_ata.amount, self.mint.decimals)?;
+
+        self.user_account.spl_staked_amount = self.user_account.spl_staked_amount.checked_add(self.vault_ata.amount).ok_or(ErrorCode::OverFlow)?;
 
         let close_accounts = CloseAccount {
             account: self.stake_account.to_account_info(),
@@ -104,9 +105,7 @@ impl <'info> UnStakeSOl <'info> {
         close_account(close_cpi_ctx)?;
 
         Ok(())
-
     }
-
 
 
 }

@@ -89,7 +89,7 @@ impl <'info> StakeSPL <'info> {
         let reward_amount = points_u64.checked_mul(amount).unwrap(); // amount is already in lamports
 
         self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
-        self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
+        self.user_account.spl_staked_amount = self.user_account.spl_staked_amount.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
 
         self.reward_user(reward_amount)?;
 

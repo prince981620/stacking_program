@@ -29,4 +29,25 @@ pub mod stacking_program {
     pub fn stake_nft(ctx: Context<StakeNFT>) -> Result<()> {
         ctx.accounts.stake_nft(&ctx.bumps)
     }
+
+    pub fn stake_sol(ctx: Context<StakeSOl>, amount: u64) -> Result<()> {
+        ctx.accounts.stake_sol(amount, &ctx.bumps)
+    }
+
+    pub fn stake_spl(ctx: Context<StakeSPL>, amount: u64) -> Result<()> {
+        ctx.accounts.stake_spl(amount, &ctx.bumps)
+    }
+
+    pub fn unstake_nft(ctx: Context<UnStakeNFT>) -> Result<()> {
+        ctx.accounts.unstake_nft()
+    }
+
+    pub fn unstake_sol(ctx: Context<UnStakeSOl>) -> Result<()> {
+        ctx.accounts.unstake_sol()
+    }
+
+    pub fn unstake_spl(ctx: Context<UnStakeSPL>) -> Result<()> {
+        ctx.accounts.unstake_spl()
+    }
+
 }
