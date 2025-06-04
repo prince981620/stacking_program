@@ -2,11 +2,11 @@ use anchor_lang::prelude::*;
 use anchor_spl::{
     metadata::{
         mpl_token_metadata::instructions::{
-            FreezeDelegatedAccountCpi, FreezeDelegatedAccountCpiAccounts, ThawDelegatedAccountCpi, ThawDelegatedAccountCpiAccounts,
+            ThawDelegatedAccountCpi, ThawDelegatedAccountCpiAccounts,
         },
         MasterEditionAccount, Metadata, MetadataAccount,
     },
-    token::{approve, mint_to, Approve, Mint, MintTo, Token, TokenAccount},
+    token::{approve, close_account, Approve, CloseAccount, Mint, Token, TokenAccount},
 };
 
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
@@ -69,11 +69,12 @@ pub struct UnStakeNFT<'info> {
     pub master_edition: Account<'info, MasterEditionAccount>,
 
     #[account(
-        init, // if we stake -> unstake and then stake again this may fail
-        payer = user,
+        mut,
+        close = user,
+        has_one = mint,
         seeds = [b"stake", config.key().as_ref(), mint.key().as_ref()],
-        bump,
-        space = 8 + StakeAccount::INIT_SPACE
+        bump = stake_account.bump,
+
     )]
     pub stake_account: Account<'info, StakeAccount>,
 
@@ -144,7 +145,23 @@ impl<'info> UnStakeNFT<'info> {
 
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_sub(1).ok_or(ErrorCode::OverFlow)?;
 
+        // now we close stake_account pda
+
+        self.close_pdas()?;
+
         Ok(())
+    }
+
+    pub fn close_pdas (&mut self) -> Result<()> {
+        let close_accounts = CloseAccount {
+            account: self.stake_account.to_account_info(),
+            destination: self.user.to_account_info(),
+            authority: self.stake_account.to_account_info()
+        };
+
+        let close_cpi_ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), close_accounts, signer_seeds);
+
+        close_account(close_cpi_ctx)
     }
 
 }
