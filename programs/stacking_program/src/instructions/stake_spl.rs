@@ -57,6 +57,7 @@ pub struct StakeSPL <'info> {
 
 
     #[account(
+        mut,
         seeds = [b"user", user.key().as_ref()],
         bump = user_account.bump
     )]

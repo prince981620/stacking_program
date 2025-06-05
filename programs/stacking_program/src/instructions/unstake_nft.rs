@@ -1,13 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::{
-    metadata::{
-        mpl_token_metadata::instructions::{
-            ThawDelegatedAccountCpi, ThawDelegatedAccountCpiAccounts,
-        },
-        MasterEditionAccount, Metadata, MetadataAccount,
-    },
-    token::{approve, close_account, Approve, CloseAccount, Mint, Token, TokenAccount},
-};
+use anchor_spl::{metadata::{mpl_token_metadata::instructions::{ ThawDelegatedAccountCpi, ThawDelegatedAccountCpiAccounts}, MasterEditionAccount, Metadata, MetadataAccount}, token::{ revoke, Mint, Revoke, Token, TokenAccount}};
 
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
@@ -61,7 +53,7 @@ pub struct UnStakeNFT<'info> {
             b"metadata",
             metadata_program.key().as_ref(),
             mint.key().as_ref(),
-            b"editon"
+            b"edition"
         ],
         bump,
         seeds::program = metadata_program.key()
@@ -85,6 +77,7 @@ pub struct UnStakeNFT<'info> {
     pub config: Account<'info, StateConfig>,
 
     #[account(
+        mut,
         seeds = [b"user", user.key().as_ref()],
         bump = user_account.bump
     )]
@@ -101,7 +94,7 @@ impl<'info> UnStakeNFT<'info> {
         let staked_at = self.stake_account.staked_at;
         let current = Clock::get()?.unix_timestamp;
 
-        require!(current.checked_sub(staked_at).unwrap() > self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
+        require!(current.checked_sub(staked_at).unwrap() >= self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
 
         let seeds = &[
             b"stake",
@@ -117,10 +110,10 @@ impl<'info> UnStakeNFT<'info> {
         let edition = &self.master_edition.to_account_info();
         let mint = &self.mint.to_account_info();
         let token_program = &self.token_program.to_account_info();
-        let metadata = &self.metadata_program.to_account_info();
+        let metadata_program = &self.metadata_program.to_account_info();
 
         ThawDelegatedAccountCpi::new(
-            metadata,
+            metadata_program,
             ThawDelegatedAccountCpiAccounts {
                 delegate,
                 token_account,
@@ -131,31 +124,18 @@ impl<'info> UnStakeNFT<'info> {
         )
         .invoke_signed(signer_seeds)?;
 
-        let cpi_program = self.token_program.to_account_info();
-        
-        let cpi_account = Approve {
-            to: self.mint_ata.to_account_info(),
-            delegate: self.user.to_account_info(),
-            authority: self.stake_account.to_account_info(),
+       let cpi_program = self.token_program.to_account_info();
+
+        let cpi_accounts = Revoke{
+            source: self.mint_ata.to_account_info(),
+            authority: self.user.to_account_info()
         };
 
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_account, signer_seeds);
+        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
 
-        approve(cpi_ctx, 1)?;
+        revoke(cpi_ctx)?;
 
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_sub(1).ok_or(ErrorCode::OverFlow)?;
-
-        // now we close stake_account pda
-
-        let close_accounts = CloseAccount {
-            account: self.stake_account.to_account_info(),
-            destination: self.user.to_account_info(),
-            authority: self.stake_account.to_account_info()
-        };
-
-        let close_cpi_ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), close_accounts, signer_seeds);
-
-        close_account(close_cpi_ctx)?;
 
         Ok(())
     }

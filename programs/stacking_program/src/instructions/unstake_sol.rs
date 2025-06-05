@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, system_program::{transfer, Transfer}};
-use anchor_spl::token::{close_account, CloseAccount, Mint, Token, TokenAccount};
+use anchor_spl::token::{ Mint, Token, TokenAccount};
 
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
@@ -26,7 +26,6 @@ pub struct UnStakeSOl <'info> {
 
     #[account(
         mut,
-        close = user,
         seeds = [b"stake", config.key().as_ref(), user.key().as_ref()], // seed so that user can stake multiple ammounts
         bump = stake_account.bump,
     )]
@@ -46,6 +45,7 @@ pub struct UnStakeSOl <'info> {
     pub vault: SystemAccount<'info>,
 
     #[account(
+        mut,
         seeds = [b"user", user.key().as_ref()],
         bump = user_account.bump
     )]
@@ -61,7 +61,7 @@ impl <'info> UnStakeSOl <'info> {
         let staked_at = self.stake_account.staked_at;
         let current = Clock::get()?.unix_timestamp;
 
-        require!(current.checked_sub(staked_at).unwrap() > self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
+        require!(current.checked_sub(staked_at).unwrap() >= self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
 
         let seeds = &[
             b"vault",
@@ -84,29 +84,9 @@ impl <'info> UnStakeSOl <'info> {
         self.user_account.sol_staked_amount = self.user_account.sol_staked_amount.checked_sub(self.vault.lamports()).ok_or(ErrorCode::OverFlow)?;
 
 
-        let seeds = &[
-            b"stake",
-            self.config.to_account_info().key.as_ref(),
-            self.user.to_account_info().key.as_ref(),
-            &[self.stake_account.bump],
-        ];
-
-        let signer_seeds = &[&seeds[..]];
-
-        let close_accounts = CloseAccount {
-            account: self.stake_account.to_account_info(),
-            destination: self.user.to_account_info(),
-            authority: self.stake_account.to_account_info()
-        };
-
-        let close_cpi_ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), close_accounts, signer_seeds);
-
-        close_account(close_cpi_ctx)?;
-
         Ok(())
 
     }
-
 
 
 }

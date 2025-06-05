@@ -84,6 +84,7 @@ pub struct StakeNFT<'info> {
     pub config: Account<'info, StateConfig>,
 
     #[account(
+        mut,
         seeds = [b"user", user.key().as_ref()],
         bump = user_account.bump
     )]
@@ -112,7 +113,7 @@ impl<'info> StakeNFT<'info> {
         let edition = &self.master_edition.to_account_info();
         let mint = &self.mint.to_account_info();
         let token_program = &self.token_program.to_account_info();
-        let metadata = &self.metadata_program.to_account_info();
+        let metadata_program = &self.metadata_program.to_account_info();
 
         let seeds = &[
             b"stake",
@@ -123,7 +124,7 @@ impl<'info> StakeNFT<'info> {
 
         let signer_seeds = &[&seeds[..]];
         FreezeDelegatedAccountCpi::new(
-            metadata,
+            metadata_program,
             FreezeDelegatedAccountCpiAccounts {
                 delegate,
                 token_account,

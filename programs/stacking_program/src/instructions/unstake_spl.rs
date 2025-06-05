@@ -47,8 +47,8 @@ pub struct UnStakeSPL <'info> {
     pub config: Account<'info, StateConfig>,
 
     #[account(
-        init,
-        payer = user,
+        mut,
+        close = user,
         associated_token::mint = mint,
         associated_token::authority = stake_account,
     )]
@@ -56,6 +56,7 @@ pub struct UnStakeSPL <'info> {
 
 
     #[account(
+        mut,
         seeds = [b"user", user.key().as_ref()],
         bump = user_account.bump
     )]
@@ -70,9 +71,16 @@ impl <'info> UnStakeSPL <'info> {
 
     pub fn unstake_spl(&mut self) -> Result<()> {
 
+        let staked_at = self.stake_account.staked_at;
+        let current = Clock::get()?.unix_timestamp;
+
+        require!(current.checked_sub(staked_at).unwrap() >= self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
+
+
         let seeds = &[
             b"stake",
             self.config.to_account_info().key.as_ref(),
+            self.user.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
             &[self.stake_account.bump],
         ];
@@ -95,7 +103,7 @@ impl <'info> UnStakeSPL <'info> {
         self.user_account.spl_staked_amount = self.user_account.spl_staked_amount.checked_add(self.vault_ata.amount).ok_or(ErrorCode::OverFlow)?;
 
         let close_accounts = CloseAccount {
-            account: self.stake_account.to_account_info(),
+            account: self.vault_ata.to_account_info(),
             destination: self.user.to_account_info(),
             authority: self.stake_account.to_account_info()
         };

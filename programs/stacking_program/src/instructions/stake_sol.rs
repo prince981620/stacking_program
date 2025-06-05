@@ -47,6 +47,7 @@ pub struct StakeSOl <'info> {
     pub vault: SystemAccount<'info>,
 
     #[account(
+        mut,
         seeds = [b"user", user.key().as_ref()],
         bump = user_account.bump
     )]
