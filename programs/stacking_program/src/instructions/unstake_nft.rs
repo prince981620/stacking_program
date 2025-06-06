@@ -64,7 +64,7 @@ pub struct UnStakeNFT<'info> {
         mut,
         close = user,
         has_one = mint,
-        seeds = [b"stake", config.key().as_ref(), mint.key().as_ref()],
+        seeds = [b"stake", config.key().as_ref(), mint.key().as_ref(), stake_account.seed.to_le_bytes().as_ref()],
         bump = stake_account.bump,
 
     )]
@@ -100,6 +100,7 @@ impl<'info> UnStakeNFT<'info> {
             b"stake",
             self.config.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
+            &self.stake_account.seed.to_le_bytes()[..],
             &[self.stake_account.bump],
         ];
 

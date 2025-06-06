@@ -99,7 +99,8 @@ impl <'info> StakeSPL <'info> {
             mint: self.mint.key(),
             staked_at: Clock::get()?.unix_timestamp,
             bump: bumps.stake_account,
-            vault_bump: 0
+            vault_bump: 0,
+            seed: 0,
         });
 
         Ok(())

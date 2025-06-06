@@ -82,7 +82,8 @@ impl <'info> StakeSOl <'info> {
             mint: native_mint::id(),
             staked_at: Clock::get()?.unix_timestamp,
             bump: bumps.stake_account,
-            vault_bump: bumps.vault
+            vault_bump: bumps.vault,
+            seed: 0,
         });
 
         Ok(())

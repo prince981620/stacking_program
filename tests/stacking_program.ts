@@ -4,12 +4,14 @@ import { StackingProgram } from "../target/types/stacking_program";
 import wallet from "../Admin-wallet.json";
 import { Commitment, Keypair, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { createMint, getAssociatedTokenAddress, getAssociatedTokenAddressSync, getOrCreateAssociatedTokenAccount, mintTo, TOKEN_PROGRAM_ID } from "@solana/spl-token";
-import { assert } from "chai";
+import { assert, use } from "chai";
 import { ASSOCIATED_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/utils/token";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import { createSignerFromKeypair, generateSigner, keypairIdentity, KeypairSigner, percentAmount } from "@metaplex-foundation/umi";
 import { createNft, findMasterEditionPda, findMetadataPda, mplTokenMetadata, verifySizedCollectionItem } from "@metaplex-foundation/mpl-token-metadata";
+import { BN } from "bn.js";
+import { randomBytes } from "crypto";
 
 describe("stacking_program", () => {
 
@@ -214,7 +216,10 @@ describe("stacking_program", () => {
   let masterEditon: PublicKey;
   let nft_mint_ata: PublicKey;
 
+  let seed: any;
   it("stake NFT" ,async ()=> {
+    seed = new BN(randomBytes(8));
+    console.log("seed",seed)
 
     nft_mint_ata = getAssociatedTokenAddressSync(
       new PublicKey(nftMint.publicKey),
@@ -229,7 +234,7 @@ describe("stacking_program", () => {
     )).address;
 
     stake_account = PublicKey.findProgramAddressSync(
-      [Buffer.from("stake"), config.toBuffer(), new PublicKey(nftMint.publicKey).toBuffer()],
+      [Buffer.from("stake"), config.toBuffer(), new PublicKey(nftMint.publicKey).toBuffer(), seed.toArrayLike(Buffer, "le", 8)],
       program.programId
     )[0];
 
@@ -237,6 +242,8 @@ describe("stacking_program", () => {
     const [masterEditon] = findMasterEditionPda(umi, {
       mint: nftMint.publicKey,
     });
+
+
 
     console.log(
       "user", user.publicKey,
@@ -253,7 +260,7 @@ describe("stacking_program", () => {
     )
 
     const tx = await program.methods
-    .stakeNft()
+    .stakeNft(seed)
     .accountsStrict({
       user: user.publicKey,
       mint: nftMint.publicKey,
@@ -283,9 +290,15 @@ describe("stacking_program", () => {
     );
     console.log("staked amount :", user_account_pda.nftStakedAmount.toNumber());
     console.log("staked points :", user_account_pda.points.toNumber());
+    // console.log("staked at :", user_account_pda.points.toNumber());
+
+    const stake_accout_pda = await program.account.stakeAccount.fetch(stake_account);
+    console.log("staked at", stake_accout_pda.stakedAt.toNumber());
   })
 
   it("unstake NFT" ,async ()=> {
+
+    // const stane_account_pda = await program.account.stakeAccount.fetch(stake_account);
 
     // const nft_mint_ata = getAssociatedTokenAddressSync(
     //   new PublicKey(nftMint.publicKey),
@@ -351,70 +364,188 @@ describe("stacking_program", () => {
   })
 
 
+  let seed1: any;
+  it("stake sol", async () => {
+  seed1 = new BN(randomBytes(8));
+  console.log("Seed value:", seed1.toString());
 
-  it("stake sol", async ()=>{
+  // Derive the stake_account PDA with correct seeds
+  const stake_account_sol = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("stake"),
+      config.toBuffer(),
+      user.publicKey.toBuffer(),
+      seed1.toArrayLike(Buffer, "le", 8),
+    ],
+    program.programId
+  )[0];
+  console.log("Derived stake_account_sol:", stake_account_sol.toBase58());
 
-    stake_account = PublicKey.findProgramAddressSync(
-      [Buffer.from("stake"), config.toBuffer(), user.publicKey.toBuffer()],
-      program.programId
-    )[0];
+  const vault = PublicKey.findProgramAddressSync(
+    [Buffer.from("vault"), stake_account_sol.toBuffer()],
+    program.programId
+  )[0];
 
-    const reward_recieved_initial = await connection.getTokenAccountBalance(user_reward_ata);
+  console.log(
+    "user", user.publicKey.toBase58(),
+    "rewardMint", reward_mint.toBase58(),
+    "userRewardAta", user_reward_ata.toBase58(),
+    "stakeAccount", stake_account_sol.toBase58(),
+    "config", config.toBase58(),
+    "vault", vault.toBase58(),
+    "userAccount", user_account.toBase58()
+  );
 
-    console.log("rewards_received initial:", reward_recieved_initial);
-
-    
-
-    const vault = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), stake_account.toBuffer()],
-      program.programId
-    )[0];
-
-    const tx = await program.methods
-    .stakeSol(new anchor.BN(1_000_000_000))
+  const tx = await program.methods
+    .stakeSol(new anchor.BN(1_000_000_000), seed1)
     .accountsStrict({
       user: user.publicKey,
       rewardMint: reward_mint,
       userRewardAta: user_reward_ata,
-      stakeAccount: stake_account,
+      stakeAccount: stake_account_sol,
       config: config,
       vault: vault,
       userAccount: user_account,
       tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: anchor.web3.SystemProgram.programId
+      systemProgram: anchor.web3.SystemProgram.programId,
     })
     .signers([user])
-    .rpc()
+    .rpc();
 
-    console.log("tx :", tx);
+  console.log("tx:", tx);
 
-    const vault_balance = await connection.getBalance(vault);
-    console.log("vault_balace :", vault_balance);
-    assert(vault_balance === 1*LAMPORTS_PER_SOL, "Vault Balance not equail");
+  const vault_balance = await connection.getBalance(vault);
+  console.log("vault_balance:", vault_balance);
+  assert(vault_balance === 1 * LAMPORTS_PER_SOL, "Vault Balance not equal");
 
-    const reward_recieved = await connection.getTokenAccountBalance(user_reward_ata);
+  const reward_received = await connection.getTokenAccountBalance(user_reward_ata);
+  console.log("rewards_received:", reward_received?.value?.uiAmount);
+});
+  // let stake_account:any;
+  // it("stake sol", async ()=>{
 
-    console.log("rewards_received :", reward_recieved?.value?.uiAmount);
+  //   seed1 = new BN(randomBytes(8));
+  //   console.log("Seed value:", seed1.toString());
 
-  })
+  //   const stake_account_sol = PublicKey.findProgramAddressSync(
+  //     [Buffer.from("stake"), config.toBuffer(),new PublicKey(user.publicKey).toBuffer(), seed1.toArrayLike(Buffer, "le", 8)],
+  //     program.programId
+  //   )[0];
 
-  it("unstake sol", async ()=>{
+  //   const reward_recieved_initial = await connection.getTokenAccountBalance(user_reward_ata);
 
-    stake_account = PublicKey.findProgramAddressSync(
-      [Buffer.from("stake"), config.toBuffer(), user.publicKey.toBuffer()],
-      program.programId
-    )[0];
+  //   console.log("rewards_received initial:", reward_recieved_initial);
 
-    const reward_recieved_initial = await connection.getTokenAccountBalance(user_reward_ata);
+    
 
-    console.log("rewards_received initial:", reward_recieved_initial);
+  //   const vault = PublicKey.findProgramAddressSync(
+  //     [Buffer.from("vault"), stake_account_sol.toBuffer()],
+  //     program.programId
+  //   )[0];
 
-    const vault = PublicKey.findProgramAddressSync(
-      [Buffer.from("vault"), stake_account.toBuffer()],
-      program.programId
-    )[0];
+  //   console.log(
+  //     "user", user.publicKey,
+  //     "rewardMint", reward_mint,
+  //     "userRewardAta", user_reward_ata,
+  //     "stakeAccount", stake_account_sol,
+  //     "config", config,
+  //     "vault", vault,
+  //     "userAccount", user_account,
+  //   )
 
-    const tx = await program.methods
+
+
+  //   const tx = await program.methods
+  //   .stakeSol(new anchor.BN(1_000_000_000), seed1)
+  //   .accountsStrict({
+  //     user: user.publicKey,
+  //     rewardMint: reward_mint,
+  //     userRewardAta: user_reward_ata,
+  //     stakeAccount: stake_account_sol,
+  //     config: config,
+  //     vault: vault,
+  //     userAccount: user_account,
+  //     tokenProgram: TOKEN_PROGRAM_ID,
+  //     systemProgram: anchor.web3.SystemProgram.programId
+  //   })
+  //   .signers([user])
+  //   .rpc()
+
+  //   console.log("tx :", tx);
+
+  //   const vault_balance = await connection.getBalance(vault);
+  //   console.log("vault_balace :", vault_balance);
+  //   assert(vault_balance === 1*LAMPORTS_PER_SOL, "Vault Balance not equail");
+
+  //   const reward_recieved = await connection.getTokenAccountBalance(user_reward_ata);
+
+  //   console.log("rewards_received :", reward_recieved?.value?.uiAmount);
+
+  // })
+
+  // it("unstake sol", async ()=>{
+  //   console.log("seed",seed1.toString())
+  //   const stake_account = PublicKey.findProgramAddressSync(
+  //     [Buffer.from("stake"), config.toBuffer(),new PublicKey(user.publicKey).toBuffer(), seed1.toArrayLike(Buffer, "le", 8)],
+  //     program.programId
+  //   )[0];
+
+  //   const reward_recieved_initial = await connection.getTokenAccountBalance(user_reward_ata);
+
+  //   console.log("rewards_received initial:", reward_recieved_initial);
+
+  //   const vault = PublicKey.findProgramAddressSync(
+  //     [Buffer.from("vault"), stake_account.toBuffer()],
+  //     program.programId
+  //   )[0];
+
+  //   const tx = await program.methods
+  //   .unstakeSol()
+  //   .accountsStrict({
+  //     user: user.publicKey,
+  //     rewardMint: reward_mint,
+  //     userRewardAta: user_reward_ata,
+  //     stakeAccount: stake_account,
+  //     config: config,
+  //     vault: vault,
+  //     userAccount: user_account,
+  //     tokenProgram: TOKEN_PROGRAM_ID,
+  //     systemProgram: anchor.web3.SystemProgram.programId
+  //   })
+  //   .signers([user])
+  //   .rpc()
+
+  //   console.log("tx :", tx);
+
+  //   const vault_balance = await connection.getBalance(vault);
+  //   console.log("vault_balace :", vault_balance);
+  //   assert(vault_balance === 0, "Vault Balance not equail");
+
+  //   const reward_recieved = await connection.getTokenAccountBalance(user_reward_ata);
+
+  //   console.log("rewards_received :", reward_recieved?.value?.uiAmount);
+
+  // })
+
+  it("unstake sol", async () => {
+  console.log("seed", seed1.toString());
+
+  const stake_account = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("stake"),
+      config.toBuffer(),
+      user.publicKey.toBuffer(),
+      seed1.toArrayLike(Buffer, "le", 8),
+    ],
+    program.programId
+  )[0];
+
+  const vault = PublicKey.findProgramAddressSync(
+    [Buffer.from("vault"), stake_account.toBuffer()],
+    program.programId
+  )[0];
+
+  const tx = await program.methods
     .unstakeSol()
     .accountsStrict({
       user: user.publicKey,
@@ -425,28 +556,29 @@ describe("stacking_program", () => {
       vault: vault,
       userAccount: user_account,
       tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: anchor.web3.SystemProgram.programId
+      systemProgram: anchor.web3.SystemProgram.programId,
     })
     .signers([user])
-    .rpc()
+    .rpc();
 
-    console.log("tx :", tx);
+  console.log("tx:", tx);
 
-    const vault_balance = await connection.getBalance(vault);
-    console.log("vault_balace :", vault_balance);
-    assert(vault_balance === 0, "Vault Balance not equail");
+  const vault_balance = await connection.getBalance(vault);
+  console.log("vault_balance:", vault_balance);
+  assert(vault_balance === 0, "Vault Balance not equal");
 
-    const reward_recieved = await connection.getTokenAccountBalance(user_reward_ata);
-
-    console.log("rewards_received :", reward_recieved?.value?.uiAmount);
-
-  })
+  const reward_received = await connection.getTokenAccountBalance(user_reward_ata);
+  console.log("rewards_received:", reward_received?.value?.uiAmount);
+});
 
   let mint_ata: PublicKey;
   let vault_ata: PublicKey;
   let stake_account_spl: PublicKey;
-
+  let seed3: any;
   it("stake spl token", async () => {
+
+    seed3 = new BN(randomBytes(8));
+    console.log("seed",seed3)
 
     mint_ata = (await getOrCreateAssociatedTokenAccount(
       connection,
@@ -467,7 +599,7 @@ describe("stacking_program", () => {
     ).then(confirmTx);
 
     stake_account_spl = PublicKey.findProgramAddressSync(
-      [Buffer.from("stake"), config.toBuffer(), user.publicKey.toBuffer(), mint.toBuffer()],
+      [Buffer.from("stake"), config.toBuffer(), user.publicKey.toBuffer(), mint.toBuffer(), seed3.toArrayLike(Buffer, "le", 8)],
       program.programId
     )[0];
 
@@ -492,8 +624,10 @@ describe("stacking_program", () => {
       "userAccount", user_account,
     )
 
+
+
     const tx = await program.methods
-    .stakeSpl(new anchor.BN(10_000_000))
+    .stakeSpl(new anchor.BN(10_000_000), seed3)
     .accountsStrict({
       user: user.publicKey,
       mint: mint,

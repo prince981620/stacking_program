@@ -12,6 +12,7 @@ use anchor_spl::{
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
 #[derive(Accounts)]
+#[instruction(seed: u64)]
 pub struct StakeNFT<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
@@ -71,7 +72,7 @@ pub struct StakeNFT<'info> {
     #[account(
         init, // if we stake -> unstake and then stake again this may fail
         payer = user,
-        seeds = [b"stake", config.key().as_ref(), mint.key().as_ref()],
+        seeds = [b"stake", config.key().as_ref(), mint.key().as_ref(), seed.to_le_bytes().as_ref()],
         bump,
         space = 8 + StakeAccount::INIT_SPACE
     )]
@@ -96,7 +97,7 @@ pub struct StakeNFT<'info> {
 }
 
 impl<'info> StakeNFT<'info> {
-    pub fn stake_nft(&mut self, bumps: &StakeNFTBumps) -> Result<()> {
+    pub fn stake_nft(&mut self, seed:u64, bumps: &StakeNFTBumps) -> Result<()> {
         let cpi_program = self.token_program.to_account_info();
         let cpi_account = Approve {
             to: self.mint_ata.to_account_info(),
@@ -119,6 +120,7 @@ impl<'info> StakeNFT<'info> {
             b"stake",
             self.config.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
+            &seed.to_le_bytes()[..],
             &[bumps.stake_account],
         ];
 
@@ -141,6 +143,7 @@ impl<'info> StakeNFT<'info> {
             staked_at: Clock::get()?.unix_timestamp,
             bump: bumps.stake_account,
             vault_bump: 0,
+            seed: seed,
         });
 
         let points_u64 = u64::try_from(self.config.points_per_nft_stake).or(Err(ErrorCode::OverFlow))?;

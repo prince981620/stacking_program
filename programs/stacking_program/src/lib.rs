@@ -26,8 +26,8 @@ pub mod stacking_program {
         ctx.accounts.initialize_user(&ctx.bumps)
     }
 
-    pub fn stake_nft(ctx: Context<StakeNFT>) -> Result<()> {
-        ctx.accounts.stake_nft(&ctx.bumps)
+    pub fn stake_nft(ctx: Context<StakeNFT>, seed: u64) -> Result<()> {
+        ctx.accounts.stake_nft(seed, &ctx.bumps)
     }
 
     pub fn stake_sol(ctx: Context<StakeSOl>, amount: u64) -> Result<()> {

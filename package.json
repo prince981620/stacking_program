@@ -9,7 +9,9 @@
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
     "@metaplex-foundation/umi": "^1.2.0",
     "@metaplex-foundation/umi-bundle-defaults": "^1.2.0",
-    "@solana/spl-token": "^0.4.13"
+    "@solana/spl-token": "^0.4.13",
+    "bn.js": "^5.2.2",
+    "crypto": "^1.0.1"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.0",
