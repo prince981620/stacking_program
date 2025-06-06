@@ -30,12 +30,12 @@ pub mod stacking_program {
         ctx.accounts.stake_nft(seed, &ctx.bumps)
     }
 
-    pub fn stake_sol(ctx: Context<StakeSOl>, amount: u64) -> Result<()> {
-        ctx.accounts.stake_sol(amount, &ctx.bumps)
+    pub fn stake_sol(ctx: Context<StakeSOl>, seed: u64, amount: u64,) -> Result<()> {
+        ctx.accounts.stake_sol(seed, amount, &ctx.bumps)
     }
 
-    pub fn stake_spl(ctx: Context<StakeSPL>, amount: u64) -> Result<()> {
-        ctx.accounts.stake_spl(amount, &ctx.bumps)
+    pub fn stake_spl(ctx: Context<StakeSPL>, seed: u64, amount: u64) -> Result<()> {
+        ctx.accounts.stake_spl(seed, amount, &ctx.bumps)
     }
 
     pub fn unstake_nft(ctx: Context<UnStakeNFT>) -> Result<()> {

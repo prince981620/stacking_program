@@ -35,7 +35,7 @@ pub struct UnStakeSPL <'info> {
     #[account(
         mut,
         close = user,
-        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), mint.key().as_ref()], // seed so that user can stake multiple ammounts
+        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), mint.key().as_ref(), stake_account.seed.to_le_bytes().as_ref()], // seed so that user can stake multiple ammounts
         bump = stake_account.bump
     )]
     pub stake_account: Account<'info, StakeAccount>,
@@ -82,6 +82,7 @@ impl <'info> UnStakeSPL <'info> {
             self.config.to_account_info().key.as_ref(),
             self.user.to_account_info().key.as_ref(),
             self.mint.to_account_info().key.as_ref(),
+            &self.stake_account.seed.to_le_bytes(),
             &[self.stake_account.bump],
         ];
 

@@ -26,7 +26,7 @@ pub struct UnStakeSOl <'info> {
 
     #[account(
         mut,
-        seeds = [b"stake", config.key().as_ref(), user.key().as_ref()], // seed so that user can stake multiple ammounts
+        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), stake_account.seed.to_le_bytes().as_ref()], // seed so that user can stake multiple ammounts
         bump = stake_account.bump,
     )]
     pub stake_account: Account<'info, StakeAccount>,

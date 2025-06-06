@@ -365,12 +365,13 @@ describe("stacking_program", () => {
 
 
   let seed1: any;
+  let stake_account_sol: PublicKey;
   it("stake sol", async () => {
   seed1 = new BN(randomBytes(8));
-  console.log("Seed value:", seed1.toString());
+  // console.log("seed1",seed1)
 
   // Derive the stake_account PDA with correct seeds
-  const stake_account_sol = PublicKey.findProgramAddressSync(
+  stake_account_sol = PublicKey.findProgramAddressSync(
     [
       Buffer.from("stake"),
       config.toBuffer(),
@@ -397,7 +398,7 @@ describe("stacking_program", () => {
   );
 
   const tx = await program.methods
-    .stakeSol(new anchor.BN(1_000_000_000), seed1)
+    .stakeSol(seed1, new anchor.BN(1_000_000_000))
     .accountsStrict({
       user: user.publicKey,
       rewardMint: reward_mint,
@@ -530,18 +531,18 @@ describe("stacking_program", () => {
   it("unstake sol", async () => {
   console.log("seed", seed1.toString());
 
-  const stake_account = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("stake"),
-      config.toBuffer(),
-      user.publicKey.toBuffer(),
-      seed1.toArrayLike(Buffer, "le", 8),
-    ],
-    program.programId
-  )[0];
+  // const stake_account = PublicKey.findProgramAddressSync(
+  //   [
+  //     Buffer.from("stake"),
+  //     config.toBuffer(),
+  //     user.publicKey.toBuffer(),
+  //     seed1.toArrayLike(Buffer, "le", 8),
+  //   ],
+  //   program.programId
+  // )[0];
 
   const vault = PublicKey.findProgramAddressSync(
-    [Buffer.from("vault"), stake_account.toBuffer()],
+    [Buffer.from("vault"), stake_account_sol.toBuffer()],
     program.programId
   )[0];
 
@@ -551,7 +552,7 @@ describe("stacking_program", () => {
       user: user.publicKey,
       rewardMint: reward_mint,
       userRewardAta: user_reward_ata,
-      stakeAccount: stake_account,
+      stakeAccount: stake_account_sol,
       config: config,
       vault: vault,
       userAccount: user_account,
@@ -627,7 +628,7 @@ describe("stacking_program", () => {
 
 
     const tx = await program.methods
-    .stakeSpl(new anchor.BN(10_000_000), seed3)
+    .stakeSpl(seed3, new anchor.BN(10_000_000))
     .accountsStrict({
       user: user.publicKey,
       mint: mint,
@@ -729,5 +730,4 @@ describe("stacking_program", () => {
     console.log("rewards_received :", reward_recieved?.value?.uiAmount);
   })
 
-  
 });

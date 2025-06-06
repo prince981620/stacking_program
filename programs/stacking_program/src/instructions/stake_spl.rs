@@ -3,6 +3,7 @@ use anchor_spl::{associated_token::AssociatedToken, token::{mint_to, transfer_ch
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
 #[derive(Accounts)]
+#[instruction(seed: u64)]
 pub struct StakeSPL <'info> {
 
     #[account(mut)]
@@ -35,7 +36,7 @@ pub struct StakeSPL <'info> {
     #[account(
         init,
         payer = user,
-        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), mint.key().as_ref()], // seed so that user can stake multiple ammounts
+        seeds = [b"stake", config.key().as_ref(), user.key().as_ref(), mint.key().as_ref(), seed.to_le_bytes().as_ref()], // seed so that user can stake multiple ammounts
         bump,
         space = 8 + StakeAccount::INIT_SPACE
     )]
@@ -70,7 +71,7 @@ pub struct StakeSPL <'info> {
 
 impl <'info> StakeSPL <'info> {
 
-    pub fn stake_spl(&mut self, amount: u64, bumps: &StakeSPLBumps) -> Result<()> {
+    pub fn stake_spl(&mut self, seed:u64, amount: u64, bumps: &StakeSPLBumps) -> Result<()> {
 
         let cpi_program = self.token_program.to_account_info();
         
@@ -100,7 +101,7 @@ impl <'info> StakeSPL <'info> {
             staked_at: Clock::get()?.unix_timestamp,
             bump: bumps.stake_account,
             vault_bump: 0,
-            seed: 0,
+            seed,
         });
 
         Ok(())

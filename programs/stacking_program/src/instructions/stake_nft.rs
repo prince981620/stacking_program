@@ -143,7 +143,7 @@ impl<'info> StakeNFT<'info> {
             staked_at: Clock::get()?.unix_timestamp,
             bump: bumps.stake_account,
             vault_bump: 0,
-            seed: seed,
+            seed,
         });
 
         let points_u64 = u64::try_from(self.config.points_per_nft_stake).or(Err(ErrorCode::OverFlow))?;
