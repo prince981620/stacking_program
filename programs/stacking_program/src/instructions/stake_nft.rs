@@ -97,7 +97,10 @@ pub struct StakeNFT<'info> {
 }
 
 impl<'info> StakeNFT<'info> {
-    pub fn stake_nft(&mut self, seed:u64, bumps: &StakeNFTBumps) -> Result<()> {
+    pub fn stake_nft(&mut self, seed:u64, locked_stakers: bool, lock_period: i64, bumps: &StakeNFTBumps) -> Result<()> {
+
+        require!(lock_period >= self.config.min_freeze_period, ErrorCode::TooLessStakePeriod);
+
         let cpi_program = self.token_program.to_account_info();
         let cpi_account = Approve {
             to: self.mint_ata.to_account_info(),
@@ -136,23 +139,26 @@ impl<'info> StakeNFT<'info> {
             },
         )
         .invoke_signed(signer_seeds)?;
+        
 
         self.stake_account.set_inner(StakeAccount {
             owner: self.user.key(),
             mint: self.mint.key(),
             staked_at: Clock::get()?.unix_timestamp,
+            lock_period: lock_period,
+            locked_stackers: locked_stakers,
             bump: bumps.stake_account,
-            vault_bump: 0,
+            // vault_bump: 0,
             seed,
         });
 
-        let points_u64 = u64::try_from(self.config.points_per_nft_stake).or(Err(ErrorCode::OverFlow))?;
+        // let points_u64 = u64::try_from(self.config.points_per_nft_stake).or(Err(ErrorCode::OverFlow))?;
 
-        let reward_amount = points_u64.checked_mul(1_000_000u64).unwrap();
+        // let reward_amount = points_u64.checked_mul(1_000_000u64).unwrap();
 
-        self.reward_user(reward_amount)?;
+        self.reward_user(100_000_000u64)?; // one time reward to stake NFT
 
-        self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
+        // self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(1).ok_or(ErrorCode::OverFlow)?;
 
         Ok(())
@@ -176,6 +182,11 @@ impl<'info> StakeNFT<'info> {
 
         let ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
 
-        mint_to(ctx, amount)
+        mint_to(ctx, amount)?;
+
+        self.user_account.points = self.user_account.points.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
+
+        Ok(())
     }
+
 }

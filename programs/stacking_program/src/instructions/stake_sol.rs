@@ -40,12 +40,12 @@ pub struct StakeSOl <'info> {
     )]
     pub config: Account<'info, StateConfig>,
 
-    #[account(
-        mut,
-        seeds = [b"vault", stake_account.key().as_ref()],
-        bump,
-    )]
-    pub vault: SystemAccount<'info>,
+    // #[account(
+    //     mut,
+    //     seeds = [b"vault", stake_account.key().as_ref()],
+    //     bump,
+    // )]
+    // pub vault: SystemAccount<'info>,
 
     #[account(
         mut,
@@ -63,7 +63,7 @@ impl <'info> StakeSOl <'info> {
         let cpi_program = self.system_program.to_account_info();
         let cpi_accounts = Transfer {
             from: self.user.to_account_info(),
-            to: self.vault.to_account_info(),
+            to: self.stake_account.to_account_info(),
         };
 
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
@@ -82,8 +82,9 @@ impl <'info> StakeSOl <'info> {
             owner: self.user.key(),
             mint: native_mint::id(),
             staked_at: Clock::get()?.unix_timestamp,
+            lock_period: 0,
             bump: bumps.stake_account,
-            vault_bump: bumps.vault,
+            // vault_bump: 0,
             seed,
         });
 

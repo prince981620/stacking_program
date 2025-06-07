@@ -99,8 +99,9 @@ impl <'info> StakeSPL <'info> {
             owner: self.user.key(),
             mint: self.mint.key(),
             staked_at: Clock::get()?.unix_timestamp,
+            lock_period: 0,
             bump: bumps.stake_account,
-            vault_bump: 0,
+            // vault_bump: 0,
             seed,
         });
 

@@ -74,7 +74,7 @@ impl <'info> UnStakeSPL <'info> {
         let staked_at = self.stake_account.staked_at;
         let current = Clock::get()?.unix_timestamp;
 
-        require!(current.checked_sub(staked_at).unwrap() >= self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
+        require!(current.checked_sub(staked_at).unwrap() >= self.config.min_freeze_period, ErrorCode::FreezePeriodeNotPassed);
 
 
         let seeds = &[

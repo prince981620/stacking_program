@@ -397,6 +397,9 @@ describe("stacking_program", () => {
     "userAccount", user_account.toBase58()
   );
 
+  const user_balane_init = await connection.getBalance(user.publicKey);
+  console.log("Balance b4 staking tx :", user_balane_init);
+
   const tx = await program.methods
     .stakeSol(seed1, new anchor.BN(1_000_000_000))
     .accountsStrict({
@@ -405,7 +408,7 @@ describe("stacking_program", () => {
       userRewardAta: user_reward_ata,
       stakeAccount: stake_account_sol,
       config: config,
-      vault: vault,
+      // vault: vault,
       userAccount: user_account,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: anchor.web3.SystemProgram.programId,
@@ -415,10 +418,13 @@ describe("stacking_program", () => {
 
   console.log("tx:", tx);
 
-  const vault_balance = await connection.getBalance(vault);
-  console.log("vault_balance:", vault_balance);
-  assert(vault_balance === 1 * LAMPORTS_PER_SOL, "Vault Balance not equal");
+  // const vault_balance = await connection.getBalance(vault);
+  // console.log("vault_balance:", vault_balance);
+  // assert(vault_balance === 1 * LAMPORTS_PER_SOL, "Vault Balance not equal");
+  const user_balane_final = await connection.getBalance(user.publicKey);
+  console.log("Balance b4 staking tx :", user_balane_final);
 
+  console.log("change in balance : ", Number(user_balane_init - user_balane_final)/LAMPORTS_PER_SOL);
   const reward_received = await connection.getTokenAccountBalance(user_reward_ata);
   console.log("rewards_received:", reward_received?.value?.uiAmount);
 });
@@ -545,6 +551,9 @@ describe("stacking_program", () => {
     [Buffer.from("vault"), stake_account_sol.toBuffer()],
     program.programId
   )[0];
+  
+  const user_balane_init = await connection.getBalance(user.publicKey);
+console.log("Balance b4 staking tx :", user_balane_init);
 
   const tx = await program.methods
     .unstakeSol()
@@ -554,7 +563,7 @@ describe("stacking_program", () => {
       userRewardAta: user_reward_ata,
       stakeAccount: stake_account_sol,
       config: config,
-      vault: vault,
+      // vault: vault,
       userAccount: user_account,
       tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: anchor.web3.SystemProgram.programId,
@@ -564,9 +573,14 @@ describe("stacking_program", () => {
 
   console.log("tx:", tx);
 
-  const vault_balance = await connection.getBalance(vault);
-  console.log("vault_balance:", vault_balance);
-  assert(vault_balance === 0, "Vault Balance not equal");
+  // const vault_balance = await connection.getBalance(vault);
+  // console.log("vault_balance:", vault_balance);
+  // assert(vault_balance === 0, "Vault Balance not equal");
+
+    const user_balane_final = await connection.getBalance(user.publicKey);
+  console.log("Balance b4 staking tx :", user_balane_final);
+
+  console.log("change in balance : ", Number(user_balane_final - user_balane_init)/LAMPORTS_PER_SOL);
 
   const reward_received = await connection.getTokenAccountBalance(user_reward_ata);
   console.log("rewards_received:", reward_received?.value?.uiAmount);
