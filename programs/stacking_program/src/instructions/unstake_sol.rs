@@ -1,5 +1,5 @@
-use anchor_lang::{prelude::*, solana_program::native_token::LAMPORTS_PER_SOL, system_program::{transfer, Transfer}};
-use anchor_spl::token::{ Mint, Token, TokenAccount};
+use anchor_lang::prelude::*;
+use anchor_spl::token::{ mint_to, Mint, MintTo, Token, TokenAccount};
 
 use crate::{error::ErrorCode, StakeAccount, StateConfig, UserAccount};
 
@@ -61,8 +61,9 @@ impl <'info> UnStakeSOl <'info> {
 
         let staked_at = self.stake_account.staked_at;
         let current = Clock::get()?.unix_timestamp;
+        let time_passed = current.checked_sub(staked_at).unwrap();
 
-        require!(current.checked_sub(staked_at).unwrap() >= self.config.min_freeze_period as i64, ErrorCode::FreezePeriodeNotPassed);
+        require!( time_passed >= self.stake_account.lock_period, ErrorCode::FreezePeriodeNotPassed);
 
         // let seeds = &[
         //     b"vault",
@@ -82,11 +83,47 @@ impl <'info> UnStakeSOl <'info> {
 
         // transfer(cpi_ctx, self.vault.lamports())?;
 
+        let points_u64 = u64::try_from(self.config.points_per_sol_stake).or(Err(ErrorCode::OverFlow))?;
+        let time_passed_u64 = u64::try_from(time_passed).or(Err(ErrorCode::OverFlow))?;
+
+        let mut reward_amount: u64 = points_u64.checked_mul(time_passed_u64).ok_or(ErrorCode::OverFlow)?;
+
+        if self.stake_account.locked_stackers {
+            let annual_percentage_rate_u64 = u64::try_from(self.config.annaul_percentage_rate).or(Err(ErrorCode::OverFlow))?;
+            let product: u64 = reward_amount.checked_mul(annual_percentage_rate_u64).ok_or(ErrorCode::OverFlow)?;
+            reward_amount = product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
+        }
+
         self.user_account.sol_staked_amount = self.user_account.sol_staked_amount.checked_sub(self.stake_account.get_lamports()).ok_or(ErrorCode::OverFlow)?;
 
-
+        self.reward_user(reward_amount)?;
         Ok(())
 
+    }
+
+    pub fn reward_user(&mut self, amount: u64) -> Result<()> {
+        let cpi_program = self.token_program.to_account_info();
+
+        let cpi_accounts = MintTo {
+            mint: self.reward_mint.to_account_info(),
+            to: self.user_reward_ata.to_account_info(),
+            authority: self.config.to_account_info()
+        };
+
+        let seeds = &[
+            &b"config"[..],
+            &[self.config.bump]
+        ];
+
+        let signer_seeds = &[&seeds[..]];
+
+        let ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
+
+        mint_to(ctx, amount)?;
+
+        self.user_account.points = self.user_account.points.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
+
+        Ok(())
     }
 
 

@@ -30,16 +30,16 @@ pub mod stacking_program {
         ctx.accounts.initialize_user(&ctx.bumps)
     }
 
-    pub fn stake_nft(ctx: Context<StakeNFT>, seed: u64,locked_stackers: bool, lock_period: i64,) -> Result<()> {
+    pub fn stake_nft(ctx: Context<StakeNFT>, seed: u64, locked_stackers: bool, lock_period: i64, ) -> Result<()> {
         ctx.accounts.stake_nft(seed, locked_stackers, lock_period, &ctx.bumps)
     }
 
-    pub fn stake_sol(ctx: Context<StakeSOl>, seed: u64, amount: u64,) -> Result<()> {
-        ctx.accounts.stake_sol(seed, amount, &ctx.bumps)
+    pub fn stake_sol(ctx: Context<StakeSOl>, seed: u64, amount: u64, locked_stackers: bool, lock_period: i64, ) -> Result<()> {
+        ctx.accounts.stake_sol(seed, amount, locked_stackers, lock_period, &ctx.bumps)
     }
 
-    pub fn stake_spl(ctx: Context<StakeSPL>, seed: u64, amount: u64) -> Result<()> {
-        ctx.accounts.stake_spl(seed, amount, &ctx.bumps)
+    pub fn stake_spl(ctx: Context<StakeSPL>, seed: u64, amount: u64, locked_stackers: bool, lock_period: i64, ) -> Result<()> {
+        ctx.accounts.stake_spl(seed, amount, locked_stackers, lock_period, &ctx.bumps)
     }
 
     pub fn unstake_nft(ctx: Context<UnStakeNFT>) -> Result<()> {

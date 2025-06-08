@@ -158,7 +158,7 @@ impl<'info> StakeNFT<'info> {
 
         self.reward_user(100_000_000u64)?; // one time reward to stake NFT
 
-        // self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
+        // self.user_account.points = self.user_account.points.checked_add(100_000_000u64).ok_or(ErrorCode::OverFlow)?;
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_add(1).ok_or(ErrorCode::OverFlow)?;
 
         Ok(())

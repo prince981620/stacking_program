@@ -71,7 +71,8 @@ pub struct StakeSPL <'info> {
 
 impl <'info> StakeSPL <'info> {
 
-    pub fn stake_spl(&mut self, seed:u64, amount: u64, bumps: &StakeSPLBumps) -> Result<()> {
+    pub fn stake_spl(&mut self, seed:u64, amount: u64, locked_stakers: bool, lock_period: i64, bumps: &StakeSPLBumps) -> Result<()> {
+        require!(lock_period >= self.config.min_freeze_period, ErrorCode::TooLessStakePeriod);
 
         let cpi_program = self.token_program.to_account_info();
         
@@ -99,7 +100,8 @@ impl <'info> StakeSPL <'info> {
             owner: self.user.key(),
             mint: self.mint.key(),
             staked_at: Clock::get()?.unix_timestamp,
-            lock_period: 0,
+            lock_period: lock_period,
+            locked_stackers: locked_stakers,
             bump: bumps.stake_account,
             // vault_bump: 0,
             seed,

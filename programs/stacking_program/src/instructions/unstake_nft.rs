@@ -14,6 +14,7 @@ pub struct UnStakeNFT<'info> {
 
     #[account(
         mut,
+        close = user,
         associated_token::mint = mint,
         associated_token::authority = user
     )]
@@ -150,7 +151,7 @@ impl<'info> UnStakeNFT<'info> {
         }
 
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_sub(1).ok_or(ErrorCode::OverFlow)?;
-
+        self.reward_user(reward_amount)?;
         Ok(())
         
     }

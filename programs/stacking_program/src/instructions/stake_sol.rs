@@ -59,7 +59,9 @@ pub struct StakeSOl <'info> {
 } 
 
 impl <'info> StakeSOl <'info> {
-    pub fn stake_sol(&mut self, seed: u64, amount: u64, bumps: &StakeSOlBumps) -> Result<()> {
+    pub fn stake_sol(&mut self, seed: u64, amount: u64, locked_stakers: bool, lock_period: i64, bumps: &StakeSOlBumps) -> Result<()> {
+        require!(lock_period >= self.config.min_freeze_period, ErrorCode::TooLessStakePeriod);
+
         let cpi_program = self.system_program.to_account_info();
         let cpi_accounts = Transfer {
             from: self.user.to_account_info(),
@@ -69,20 +71,21 @@ impl <'info> StakeSOl <'info> {
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
         transfer(cpi_ctx, amount)?;
 
-        let points_u64 = u64::try_from(self.config.points_per_sol_stake).or(Err(ErrorCode::OverFlow))?;
+        // let points_u64 = u64::try_from(self.config.points_per_sol_stake).or(Err(ErrorCode::OverFlow))?;
 
-        let reward_amount = points_u64.checked_mul(amount).unwrap(); // amount is already in lamports
+        // let reward_amount = points_u64.checked_mul(amount).unwrap(); // amount is already in lamports
 
-        self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
+        // self.user_account.points = self.user_account.points.checked_add(100_000_000u64).ok_or(ErrorCode::OverFlow)?;
         self.user_account.sol_staked_amount = self.user_account.sol_staked_amount.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
 
-        self.reward_user(reward_amount)?;
+        self.reward_user(100_000_000u64)?;
 
         self.stake_account.set_inner(StakeAccount {
             owner: self.user.key(),
             mint: native_mint::id(),
             staked_at: Clock::get()?.unix_timestamp,
-            lock_period: 0,
+            lock_period: lock_period,
+            locked_stackers: locked_stakers,
             bump: bumps.stake_account,
             // vault_bump: 0,
             seed,
@@ -110,6 +113,11 @@ impl <'info> StakeSOl <'info> {
 
         let ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer_seeds);
 
-        mint_to(ctx, amount)
+        mint_to(ctx, amount)?;
+
+        self.user_account.points = self.user_account.points.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
+
+        Ok(())
+
     }
 }
