@@ -39,6 +39,11 @@ describe("stacking_program", () => {
       await Promise.all(signatures.map(confirmTx))
     }
 
+    function sleep(ms: number) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+
   // Configure the client to use the local cluster.
   anchor.setProvider(anchor.AnchorProvider.env());
 
@@ -168,8 +173,8 @@ describe("stacking_program", () => {
     
     const tx = await program.methods
     .initializeConfig(
-      10, // 10 token per second
-      5,  // 5 token per second
+      100, // 100 token per second
+      10,  // 10 token per second
       1,  // 1 token per second
       new anchor.BN(60), // 2 minutes min_lock periode
       100,
@@ -261,7 +266,7 @@ describe("stacking_program", () => {
     )
 
     const tx = await program.methods
-    .stakeNft(seed, false, new anchor.BN(60))
+    .stakeNft(seed, true, new anchor.BN(60))
     .accountsStrict({
       user: user.publicKey,
       mint: nftMint.publicKey,
@@ -337,6 +342,8 @@ describe("stacking_program", () => {
       "userAccount", user_account,
     )
 
+    await sleep(65 * 1000);
+
     const tx = await program.methods
     .unstakeNft()
     .accountsStrict({
@@ -402,7 +409,7 @@ describe("stacking_program", () => {
   console.log("Balance b4 staking tx :", user_balane_init);
 
   const tx = await program.methods
-    .stakeSol(seed1, new anchor.BN(1_000_000_000))
+    .stakeSol(seed1, new anchor.BN(1_000_000_000), true, new anchor.BN(60))
     .accountsStrict({
       user: user.publicKey,
       rewardMint: reward_mint,
@@ -554,7 +561,8 @@ describe("stacking_program", () => {
   )[0];
   
   const user_balane_init = await connection.getBalance(user.publicKey);
-console.log("Balance b4 staking tx :", user_balane_init);
+  console.log("Balance b4 staking tx :", user_balane_init);
+  await sleep(65 * 1000);
   const tx = await program.methods
     .unstakeSol()
     .accountsStrict({
@@ -640,9 +648,8 @@ console.log("Balance b4 staking tx :", user_balane_init);
     )
 
 
-
     const tx = await program.methods
-    .stakeSpl(seed3, new anchor.BN(10_000_000))
+    .stakeSpl(seed3, new anchor.BN(10_000_000), true, new anchor.BN(60))
     .accountsStrict({
       user: user.publicKey,
       mint: mint,
@@ -717,6 +724,8 @@ console.log("Balance b4 staking tx :", user_balane_init);
       "vaultAta", vault_ata,
       "userAccount", user_account,
     )
+
+    await sleep(65 * 1000);
 
     const tx = await program.methods
     .unstakeSpl()

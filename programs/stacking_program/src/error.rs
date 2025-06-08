@@ -11,6 +11,9 @@ pub enum ErrorCode {
     #[msg("Over Flow")]
     OverFlow,
 
+    #[msg("Under Flow")]
+    UnderFlow,
+
     #[msg("Stake Periode is too Low")]
     TooLessStakePeriod,
 

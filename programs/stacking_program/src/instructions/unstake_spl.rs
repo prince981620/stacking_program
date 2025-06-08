@@ -124,7 +124,8 @@ impl <'info> UnStakeSPL <'info> {
             let yield_time_u64 = u64::try_from(self.stake_account.lock_period).or(Err(ErrorCode::OverFlow))?;
             let yield_reward = yield_time_u64.checked_mul(points_u64).ok_or(ErrorCode::OverFlow)?;
             let product: u64 = yield_reward.checked_mul(annual_percentage_rate_u64).ok_or(ErrorCode::OverFlow)?;
-            reward_amount = reward_amount + product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
+            let yield_amt: u64 = product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
+            reward_amount = reward_amount.checked_add(yield_amt).ok_or(ErrorCode::OverFlow)?;
         }
         
         self.user_account.spl_staked_amount = self.user_account.spl_staked_amount.checked_add(self.vault_ata.amount).ok_or(ErrorCode::OverFlow)?;

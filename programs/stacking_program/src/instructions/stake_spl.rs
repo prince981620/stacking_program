@@ -99,6 +99,7 @@ impl <'info> StakeSPL <'info> {
         self.stake_account.set_inner(StakeAccount {
             owner: self.user.key(),
             mint: self.mint.key(),
+            staked_amt: amount,
             staked_at: Clock::get()?.unix_timestamp,
             lock_period: lock_period,
             locked_stackers: locked_stakers,

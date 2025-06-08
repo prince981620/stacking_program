@@ -14,7 +14,6 @@ pub struct UnStakeNFT<'info> {
 
     #[account(
         mut,
-        close = user,
         associated_token::mint = mint,
         associated_token::authority = user
     )]
@@ -149,11 +148,13 @@ impl<'info> UnStakeNFT<'info> {
             let yield_time_u64 = u64::try_from(self.stake_account.lock_period).or(Err(ErrorCode::OverFlow))?;
             let yield_reward = yield_time_u64.checked_mul(points_u64).ok_or(ErrorCode::OverFlow)?;
             let product: u64 = yield_reward.checked_mul(annual_percentage_rate_u64).ok_or(ErrorCode::OverFlow)?;
-            reward_amount = reward_amount + product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
+            let yield_amt: u64 = product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
+            reward_amount = reward_amount.checked_add(yield_amt).ok_or(ErrorCode::OverFlow)?;
         }
 
         self.user_account.nft_staked_amount = self.user_account.nft_staked_amount.checked_sub(1).ok_or(ErrorCode::OverFlow)?;
         self.reward_user(reward_amount)?;
+        self.user_account.points = self.user_account.points.checked_add(reward_amount).ok_or(ErrorCode::OverFlow)?;
         Ok(())
         
     }
@@ -178,7 +179,6 @@ impl<'info> UnStakeNFT<'info> {
 
         mint_to(ctx, amount)?;
 
-        self.user_account.points = self.user_account.points.checked_add(amount).ok_or(ErrorCode::OverFlow)?;
 
         Ok(())
     }
