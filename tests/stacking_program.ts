@@ -168,10 +168,11 @@ describe("stacking_program", () => {
     
     const tx = await program.methods
     .initializeConfig(
-      200,
+      10, // 10 token per second
+      5,  // 5 token per second
+      1,  // 1 token per second
+      new anchor.BN(60), // 2 minutes min_lock periode
       100,
-      50,
-      0,
     )
     .accountsStrict({
       admin: admin.publicKey,
@@ -554,7 +555,6 @@ describe("stacking_program", () => {
   
   const user_balane_init = await connection.getBalance(user.publicKey);
 console.log("Balance b4 staking tx :", user_balane_init);
-
   const tx = await program.methods
     .unstakeSol()
     .accountsStrict({

@@ -38,16 +38,16 @@ impl <'info> InitializeConfig <'info> {
     pub fn initialize_config(
         &mut self,
         points_per_nft_stake: u8,
-        points_per_spl_stake: u8,
         points_per_sol_stake: u8,
+        points_per_spl_stake: u8,
         min_freeze_period: i64,
         annaul_percentage_rate: u16,
         bumps: &InitializeConfigBumps,
     ) -> Result<()> {
         self.config.set_inner(StateConfig {
             points_per_nft_stake,
-            points_per_spl_stake,
             points_per_sol_stake,
+            points_per_spl_stake,
             min_freeze_period,
             annaul_percentage_rate,
             rewards_bump: bumps.reward_mint, 
