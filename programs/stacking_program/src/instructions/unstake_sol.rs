@@ -90,13 +90,16 @@ impl <'info> UnStakeSOl <'info> {
 
         if self.stake_account.locked_stackers {
             let annual_percentage_rate_u64 = u64::try_from(self.config.annaul_percentage_rate).or(Err(ErrorCode::OverFlow))?;
-            let product: u64 = reward_amount.checked_mul(annual_percentage_rate_u64).ok_or(ErrorCode::OverFlow)?;
-            reward_amount = product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
+            let yield_time_u64 = u64::try_from(self.stake_account.lock_period).or(Err(ErrorCode::OverFlow))?;
+            let yield_reward = yield_time_u64.checked_mul(points_u64).ok_or(ErrorCode::OverFlow)?;
+            let product: u64 = yield_reward.checked_mul(annual_percentage_rate_u64).ok_or(ErrorCode::OverFlow)?;
+            reward_amount = reward_amount + product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
         }
 
         self.user_account.sol_staked_amount = self.user_account.sol_staked_amount.checked_sub(self.stake_account.get_lamports()).ok_or(ErrorCode::OverFlow)?;
 
         self.reward_user(reward_amount)?;
+
         Ok(())
 
     }

@@ -147,7 +147,7 @@ impl<'info> UnStakeNFT<'info> {
         if self.stake_account.locked_stackers {
             let annual_percentage_rate_u64 = u64::try_from(self.config.annaul_percentage_rate).or(Err(ErrorCode::OverFlow))?;
             let yield_time_u64 = u64::try_from(self.stake_account.lock_period).or(Err(ErrorCode::OverFlow))?;
-            let yield_reward = yield_time_u64.checked_mul(yield_time_u64).ok_or(ErrorCode::OverFlow)?;
+            let yield_reward = yield_time_u64.checked_mul(points_u64).ok_or(ErrorCode::OverFlow)?;
             let product: u64 = yield_reward.checked_mul(annual_percentage_rate_u64).ok_or(ErrorCode::OverFlow)?;
             reward_amount = reward_amount + product.checked_div(10_000u64).ok_or(ErrorCode::OverFlow)?;
         }
