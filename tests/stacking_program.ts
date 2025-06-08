@@ -261,7 +261,7 @@ describe("stacking_program", () => {
     )
 
     const tx = await program.methods
-    .stakeNft(seed)
+    .stakeNft(seed, false, new anchor.BN(60))
     .accountsStrict({
       user: user.publicKey,
       mint: nftMint.publicKey,
